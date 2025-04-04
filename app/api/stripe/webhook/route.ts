@@ -1,42 +1,41 @@
-import { buffer } from 'micro';
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest } from 'next/server';
 import Stripe from 'stripe';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2022-11-15',
+  apiVersion: '2023-08-16',
 });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).end('Method Not Allowed');
+import { Readable } from 'stream';
+
+async function buffer(readable: Readable) {
+  const chunks = [];
+  for await (const chunk of readable) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
   }
+  return Buffer.concat(chunks);
+}
 
-  const buf = await buffer(req);
-  const sig = req.headers['stripe-signature']!;
+export async function POST(req: NextRequest) {
+  const sig = req.headers.get('stripe-signature')!;
+  const rawBody = await req.text(); // 👈 This gives raw body
 
-  let event: Stripe.Event;
+  let event;
 
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
   } catch (err) {
-    console.error('Webhook signature verification failed.', err);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error('❌ Webhook signature verification failed:', err);
+    return new Response(`Webhook Error: ${(err as Error).message}`, { status: 400 });
   }
 
-  // Handle the event
-  switch (event.type) {
-    case 'checkout.session.completed':
-      console.log('✅ Checkout session completed:', event.data.object);
-      break;
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
+  // ✅ Handle event
+  if (event.type === 'checkout.session.completed') {
+    console.log('✅ Checkout completed:', event.data.object);
   }
 
-  res.status(200).send('Webhook received');
+  return new Response('Webhook received', { status: 200 });
 }

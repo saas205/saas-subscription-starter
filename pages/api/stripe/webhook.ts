@@ -24,15 +24,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET!);
-  } catch (err) {
-    console.error('Webhook signature verification failed.', err);
+  } catch (err: any) {
+    console.error('❌ Webhook verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle the event
+  // ✅ Handle Stripe events here
   switch (event.type) {
     case 'checkout.session.completed':
-      console.log('✅ Checkout session completed:', event.data.object);
+      console.log('✅ Checkout complete:', event.data.object);
       break;
     default:
       console.log(`Unhandled event type: ${event.type}`);

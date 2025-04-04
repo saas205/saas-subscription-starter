@@ -1,12 +1,12 @@
+// app/api/stripe/webhook/route.ts
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Recommended Stripe config for webhooks
-export const dynamic = 'force-dynamic'; // Ensure no static behavior
-export const runtime = 'nodejs'; // Stripe SDK works better in Node.js runtime
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Stripe needs Node.js runtime
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-08-16',
+  apiVersion: '2025-03-31', // Match your Stripe dashboard version
 });
 
 export async function POST(request: Request) {
@@ -51,11 +51,17 @@ export async function POST(request: Request) {
       // Add your business logic here
       break;
     
+    case 'product.updated':
+      const product = event.data.object;
+      console.log('🔄 Product updated:', product.id);
+      // Add your business logic here
+      break;
+    
     // Add more event types as needed
     
     default:
       console.log(`🤷‍♀️ Unhandled event type: ${event.type}`);
   }
 
-  return NextResponse.json({ received: true });
+  return NextResponse.json({ received: true }, { status: 200 });
 }
